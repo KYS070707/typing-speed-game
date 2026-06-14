@@ -428,7 +428,7 @@ function falseStart() {
 }
 
 /* ── Finish ── */
-function finish(ok, wrongKey) {
+async function finish(ok, wrongKey) {
     state = 'done';
     cancelAnimationFrame(rafId);
     elapsed = (performance.now() - t0) / 1000;
@@ -438,17 +438,29 @@ function finish(ok, wrongKey) {
     if (ok) {
         $('r-title').textContent = '완주!';  $('r-title').className = 'r-title ok';
         $('r-time').textContent  = elapsed.toFixed(3) + 's';
-        $('r-sub').textContent   = 'a → z 를 모두 입력했습니다!';
-        $('name-form').style.display = '';
-        $('btn-save').disabled = false;
-        $('name-inp').value = '';
-        setTimeout(() => $('name-inp').focus(), 80);
-    } else {
-        $('r-title').textContent = '실패';  $('r-title').className = 'r-title ng';
-        $('r-time').textContent = elapsed.toFixed(3) + 's';
-        $('r-sub').textContent  = `"${ALPHA[curIdx]}" 을 입력해야 할 때 "${wrongKey}" 를 눌렀습니다.`;
-        $('name-form').style.display = 'none';
+        // 현재 랭킹을 불러와 TOP 7 진입 여부 판단 → 진입할 때만 이름 입력 받음
+        $('lb-list').innerHTML = '<div class="lb-empty">불러오는 중…</div>';
+        const lb = await getLB();
+        const full = lb.length >= 7;
+        const qualifies = !full || elapsed < Number(lb[lb.length - 1].time);
+        if (qualifies) {
+            $('r-sub').textContent = 'TOP 7 진입! 이름을 입력해 기록을 저장하세요.';
+            $('name-form').style.display = '';
+            $('btn-save').disabled = false;
+            $('name-inp').value = '';
+            setTimeout(() => $('name-inp').focus(), 80);
+        } else {
+            const cut = Number(lb[lb.length - 1].time).toFixed(3);
+            $('r-sub').textContent = `a → z 완주! 아쉽게도 TOP 7(${cut}s)에는 들지 못했어요.`;
+            $('name-form').style.display = 'none';
+        }
+        renderLB(null, lb);
+        return;
     }
+    $('r-title').textContent = '실패';  $('r-title').className = 'r-title ng';
+    $('r-time').textContent = elapsed.toFixed(3) + 's';
+    $('r-sub').textContent  = `"${ALPHA[curIdx]}" 을 입력해야 할 때 "${wrongKey}" 를 눌렀습니다.`;
+    $('name-form').style.display = 'none';
     renderLB(null);
 }
 
@@ -473,12 +485,17 @@ async function saveLB(name, time) {
 const MEDALS = ['🥇','🥈','🥉','4위','5위','6위','7위'];
 function esc(s) { return s.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
 let lbReqId = 0;
-async function renderLB(hlTime) {
+async function renderLB(hlTime, preFetched) {
     const list = $('lb-list');
     const myReq = ++lbReqId;
-    list.innerHTML = '<div class="lb-empty">불러오는 중…</div>';
-    const lb = await getLB();
-    if (myReq !== lbReqId) return;            // 더 최신 요청이 있으면 이 결과는 버림
+    let lb;
+    if (preFetched) {
+        lb = preFetched;                      // 이미 불러온 데이터 재사용(중복 요청 방지)
+    } else {
+        list.innerHTML = '<div class="lb-empty">불러오는 중…</div>';
+        lb = await getLB();
+        if (myReq !== lbReqId) return;        // 더 최신 요청이 있으면 이 결과는 버림
+    }
     if (!lb.length) { list.innerHTML = '<div class="lb-empty">아직 기록이 없습니다.</div>'; return; }
     list.innerHTML = lb.map((e, i) => {
         const hl = hlTime !== null && Math.abs(Number(e.time) - hlTime) < 0.001;
