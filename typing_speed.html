@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>타이핑 속도 측정기</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            background: #0a0a18;
+            color: #e0e0f0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container { text-align: center; width: 100%; max-width: 720px; }
+
+        h1 {
+            font-size: 1.8rem;
+            letter-spacing: 8px;
+            color: #ffcc00;
+            text-shadow: 0 0 24px #ffcc0055;
+            margin-bottom: 30px;
+        }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* ── Ready ── */
+        .instructions { font-size: 1rem; color: #7777aa; line-height: 2.2; margin-bottom: 28px; }
+        .hint { font-size: 1rem; color: #8888bb; margin-top: 16px; }
+        kbd {
+            display: inline-block;
+            padding: 1px 7px;
+            font-size: 1.56rem;
+            font-family: inherit;
+            background: #1e1e3a;
+            border: 1px solid #4444aa;
+            border-radius: 4px;
+            color: #9999cc;
+        }
+
+        /* ── Countdown ── */
+        #cd-num {
+            font-size: 14rem;
+            font-weight: 900;
+            line-height: 1;
+            color: #ff3333;
+            text-shadow: 0 0 60px #ff333344;
+        }
+        @keyframes numPop {
+            0%   { transform: scale(1.4); opacity: 0.55; }
+            100% { transform: scale(1);   opacity: 1; }
+        }
+        @keyframes startBurst {
+            0%   { transform: scale(0.65); opacity: 0.4; }
+            60%  { transform: scale(1.2); }
+            100% { transform: scale(1);   opacity: 1; }
+        }
+        #cd-num.pop   { animation: numPop 0.22s ease forwards; }
+        #cd-num.start { color: #00ff88; text-shadow: 0 0 60px #00ff8855; animation: startBurst 0.48s ease forwards; }
+
+        /* ── Game: alpha row ── */
+        #alpha-row {
+            display: flex;
+            flex-wrap: nowrap;
+            justify-content: center;
+            gap: 2px;
+            margin-bottom: 12px;
+        }
+        .abox {
+            width: 24px; height: 24px;
+            line-height: 24px;
+            font-size: 0.75rem; font-weight: 700;
+            border-radius: 4px;
+            background: #141428; color: #38386a;
+            border: 1px solid #1e1e44;
+            transition: background .12s, color .12s, border-color .12s;
+        }
+        .abox.done { background: #0a2218; color: #00bb55; border-color: #00bb55; }
+        .abox.cur  {
+            background: #10104a; color: #fff; border-color: #3366ff;
+            box-shadow: 0 0 10px #3366ff88;
+            animation: aPulse 0.8s ease-in-out infinite;
+        }
+        @keyframes aPulse {
+            0%,100% { box-shadow: 0 0 10px #3366ff88; }
+            50%     { box-shadow: 0 0 22px #7799ff; }
+        }
+
+        /* Timer */
+        #timer {
+            font-size: 5.5rem; font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: #fff; letter-spacing: 3px;
+            margin: 6px 0;
+            text-shadow: 0 0 18px #ffffff22;
+        }
+        #status { font-size: 0.9rem; color: #6666aa; height: 20px; margin-bottom: 18px; }
+
+        /* ── Keyboard ── */
+        .kbd { display: inline-block; text-align: left; }
+        .krow { display: flex; gap: 5px; margin-bottom: 5px; }
+        .krow:nth-child(2) { padding-left: 25px; }
+        .krow:nth-child(3) { padding-left: 50px; }
+
+        .key {
+            width: 46px; height: 46px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; font-weight: 700;
+            border-radius: 7px;
+            background: #181830; color: #44446a;
+            border: 2px solid #22224a;
+            transition: all 0.12s;
+            user-select: none;
+        }
+        .key.done { background: #0a2218; color: #009940; border-color: #009940; }
+        .key.cur  {
+            background: #001699; color: #fff; border-color: #4488ff;
+            box-shadow: 0 0 18px #4488ffaa;
+            transform: scale(1.12) translateY(-3px);
+        }
+
+        /* ── Result ── */
+        .r-title { font-size: 3rem; font-weight: 900; letter-spacing: 5px; margin-bottom: 10px; }
+        .r-title.ok { color: #00ff88; text-shadow: 0 0 30px #00ff8855; }
+        .r-title.ng { color: #ff4444; text-shadow: 0 0 30px #ff444455; }
+        .r-time {
+            font-size: 5rem; font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: #fff; margin-bottom: 8px;
+        }
+        .r-sub { font-size: 0.9rem; color: #7777aa; margin-bottom: 20px; }
+
+        /* Name form */
+        #name-form { margin-bottom: 20px; }
+        #name-form label { display: block; font-size: 0.9rem; color: #9999cc; margin-bottom: 10px; }
+        #name-inp {
+            padding: 9px 14px; font-size: 1rem;
+            background: #12122a; border: 2px solid #2a2aaa;
+            border-radius: 7px; color: #fff;
+            width: 190px; text-align: center;
+            outline: none; margin-right: 8px;
+        }
+        #name-inp:focus { border-color: #5566ff; box-shadow: 0 0 8px #5566ff44; }
+
+        /* Leaderboard */
+        #lb { margin: 0 auto 20px; max-width: 460px; }
+        #lb h3 { font-size: 0.95rem; letter-spacing: 3px; color: #ffcc00; margin-bottom: 10px; }
+        .lb-row {
+            display: flex; align-items: center;
+            padding: 8px 14px; margin-bottom: 4px;
+            border-radius: 6px; background: #0e0e28;
+            border: 1px solid #1c1c40;
+        }
+        .lb-row.hl { border-color: #ffcc00; background: #181808; }
+        .lb-rank { width: 32px; font-size: 1.1rem; }
+        .lb-name { flex: 1; text-align: left; font-size: 0.9rem; color: #cccce8; }
+        .lb-time { font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #88ccff; }
+        .lb-date { font-size: 0.7rem; color: #44446a; margin-left: 8px; }
+        .lb-empty { color: #44446a; font-size: 0.9rem; padding: 14px; }
+
+        .hr { border: none; border-top: 1px solid #1c1c3a; margin: 16px auto; width: 75%; }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 34px; font-size: 1rem; font-weight: 700;
+            letter-spacing: 1px; border: none; border-radius: 8px;
+            cursor: pointer; transition: transform .1s, opacity .1s;
+        }
+        .btn:hover  { opacity: 0.88; }
+        .btn:active { transform: scale(0.96); }
+        .btn-go {
+            background: linear-gradient(135deg, #ff5500, #ffcc00);
+            color: #000; font-size: 1.2rem; padding: 15px 52px;
+            box-shadow: 0 4px 24px #ff550044; letter-spacing: 2px;
+        }
+        .btn-save  { background: #2244ff; color: #fff; }
+        .btn-again { background: #12122a; color: #9999cc; border: 1px solid #2a2a66; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>⚡ TYPING SPEED ⚡</h1>
+
+    <!-- ① Ready -->
+    <div id="s-ready" class="screen active">
+        <p class="instructions">
+            a → z 까지 순서대로 입력하는 시간을 측정합니다.<br>
+            순서가 틀리면 즉시 종료됩니다.
+        </p>
+        <button class="btn btn-go" id="btn-start">START ENGINE</button>
+        <p class="hint">버튼 클릭 또는 <kbd>Space</kbd> 를 누르면 4초 카운트다운 후 시작됩니다.</p>
+    </div>
+
+    <!-- ② Countdown -->
+    <div id="s-cd" class="screen">
+        <div id="cd-num">4</div>
+    </div>
+
+    <!-- ③ Game -->
+    <div id="s-game" class="screen">
+        <div id="alpha-row"></div>
+        <div id="timer">0.000</div>
+        <div id="status"></div>
+        <div class="kbd" id="kbd"></div>
+    </div>
+
+    <!-- ④ Result -->
+    <div id="s-result" class="screen">
+        <div class="r-title" id="r-title"></div>
+        <div class="r-time"  id="r-time"></div>
+        <div class="r-sub"   id="r-sub"></div>
+        <div id="name-form">
+            <label>이름을 입력하고 기록을 저장하세요</label>
+            <input id="name-inp" type="text" placeholder="이름 (최대 10자)" maxlength="10" />
+            <button class="btn btn-save" id="btn-save">저장</button>
+        </div>
+        <hr class="hr">
+        <div id="lb">
+            <h3>🏆 TOP 7 RANKING</h3>
+            <div id="lb-list"></div>
+        </div>
+        <button class="btn btn-again" id="btn-again">다시 시작 (ESC)</button>
+    </div>
+</div>
+
+<script>
+const ALPHA = 'abcdefghijklmnopqrstuvwxyz'.split('');
+const KB_ROWS = [
+    ['q','w','e','r','t','y','u','i','o','p'],
+    ['a','s','d','f','g','h','j','k','l'],
+    ['z','x','c','v','b','n','m']
+];
+/* ── Supabase 랭킹 서버 설정 ──
+   아래 두 값을 Supabase 프로젝트의 Settings → API 에서 복사해 채우세요.
+   anon 키는 공개되도록 설계된 키라 그대로 넣어도 됩니다(보안은 RLS가 담당). */
+const SUPABASE_URL  = 'https://vercrjcxlwwruxsydfqq.supabase.co';   // ← 본인 Project URL
+const SUPABASE_ANON = 'sb_publishable_lxkMgdYFfBs-LII-GLiQpQ_UWQWZa0Z';  // ← 본인 publishable key
+const SCORES_API = `${SUPABASE_URL}/rest/v1/scores`;
+const SB_HEADERS = {
+    apikey: SUPABASE_ANON,
+    Authorization: `Bearer ${SUPABASE_ANON}`,
+    'Content-Type': 'application/json'
+};
+
+let state    = 'idle';
+let curIdx   = 0;
+let t0       = null;
+let rafId    = null;
+let elapsed  = 0;
+let audioCtx = null;
+
+const $ = id => document.getElementById(id);
+const screens = { ready:$('s-ready'), cd:$('s-cd'), game:$('s-game'), result:$('s-result') };
+
+function show(name) {
+    Object.entries(screens).forEach(([k,el]) => el.classList.toggle('active', k === name));
+}
+
+/* ── Audio ── */
+function audio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+}
+
+function beep() {
+    try {
+        const ctx = audio(), t = ctx.currentTime;
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        g.gain.setValueAtTime(0.3, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.start(t); osc.stop(t + 0.2);
+    } catch(e) {}
+}
+
+function startSound() {
+    try {
+        const ctx = audio(), t = ctx.currentTime;
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 1760;
+        g.gain.setValueAtTime(0.35, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        osc.start(t); osc.stop(t + 0.45);
+    } catch(e) {}
+}
+
+/* ── Countdown ── */
+function doStart() { state = 'countdown'; show('cd'); countdown(4); }
+$('btn-start').addEventListener('click', doStart);
+
+function countdown(n) {
+    if (state !== 'countdown') return;
+    const el = $('cd-num');
+    el.className = '';
+    void el.offsetWidth;
+    el.textContent = n;
+    el.className = 'pop';
+    beep();
+    if (n > 1) {
+        setTimeout(() => countdown(n - 1), 1000);
+    } else {
+        setTimeout(() => {
+            if (state !== 'countdown') return;
+            startSound();
+            beginGame();
+        }, 1000);
+    }
+}
+
+/* ── Game setup ── */
+function buildAlpha() {
+    const row = $('alpha-row');
+    row.innerHTML = '';
+    ALPHA.forEach(ch => {
+        const d = document.createElement('div');
+        d.className = 'abox'; d.id = 'ab-'+ch; d.textContent = ch;
+        row.appendChild(d);
+    });
+}
+
+function buildKbd() {
+    const kbd = $('kbd');
+    kbd.innerHTML = '';
+    KB_ROWS.forEach(row => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'krow';
+        row.forEach(ch => {
+            const k = document.createElement('div');
+            k.className = 'key'; k.id = 'k-'+ch; k.textContent = ch.toUpperCase();
+            rowEl.appendChild(k);
+        });
+        kbd.appendChild(rowEl);
+    });
+}
+
+function refresh() {
+    ALPHA.forEach((ch, i) => {
+        const el = $('ab-'+ch);
+        el.className = 'abox' + (i < curIdx ? ' done' : i === curIdx ? ' cur' : '');
+    });
+    document.querySelectorAll('.key').forEach(k => k.classList.remove('done','cur'));
+    ALPHA.slice(0, curIdx).forEach(ch => { const k=$('k-'+ch); if(k) k.classList.add('done'); });
+    if (curIdx < ALPHA.length) { const k=$('k-'+ALPHA[curIdx]); if(k) k.classList.add('cur'); }
+}
+
+function beginGame() {
+    curIdx = 0; elapsed = 0; state = 'playing';
+    buildAlpha(); buildKbd(); refresh();
+    $('timer').textContent = '0.000';
+    $('status').textContent = '🟢 START!  — a 부터 입력하세요';
+    setTimeout(() => { if (state === 'playing' && curIdx === 0) $('status').textContent = 'a 부터 시작!'; }, 800);
+    t0 = performance.now();
+    rafId = requestAnimationFrame(tick);
+    show('game');
+}
+
+/* ── Timer RAF ── */
+function tick() {
+    if (state !== 'playing') return;
+    $('timer').textContent = ((performance.now() - t0) / 1000).toFixed(3);
+    rafId = requestAnimationFrame(tick);
+}
+
+/* ── Key input (single listener for all states) ── */
+document.addEventListener('keydown', e => {
+    if (state === 'idle' && e.code === 'Space') {
+        e.preventDefault(); doStart(); return;
+    }
+    if (state === 'done' && e.key === 'Escape') {
+        doRestart(); return;
+    }
+    if (state === 'countdown' && e.key.length === 1) {
+        e.preventDefault(); falseStart(); return;
+    }
+    if (state !== 'playing') return;
+    const key = e.key.toLowerCase();
+    if (!/^[a-z]$/.test(key)) return;
+    e.preventDefault();
+
+    if (key === ALPHA[curIdx]) {
+        curIdx++;
+        refresh();
+        if (curIdx === ALPHA.length) finish(true);
+        else $('status').textContent = '다음: ' + ALPHA[curIdx].toUpperCase();
+    } else {
+        finish(false, key);
+    }
+});
+
+/* ── False start ── */
+function falseStartSound() {
+    try {
+        const ctx = audio();
+        [1040, 780, 580, 440].forEach((freq, i) => {
+            const t = ctx.currentTime + i * 0.18;
+            const osc = ctx.createOscillator(), g = ctx.createGain();
+            osc.connect(g); g.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            g.gain.setValueAtTime(0.28, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+            osc.start(t); osc.stop(t + 0.25);
+        });
+    } catch(e) {}
+}
+
+function falseStart() {
+    state = 'done';
+    falseStartSound();
+    show('result');
+    $('r-title').textContent = '부정출발!';  $('r-title').className = 'r-title ng';
+    $('r-time').textContent  = '—';
+    $('r-sub').textContent   = '카운트다운 중에 키를 눌렀습니다.';
+    $('name-form').style.display = 'none';
+    renderLB(null);
+}
+
+/* ── Finish ── */
+function finish(ok, wrongKey) {
+    state = 'done';
+    cancelAnimationFrame(rafId);
+    elapsed = (performance.now() - t0) / 1000;
+    if (ok) $('timer').textContent = elapsed.toFixed(3);
+    show('result');
+
+    if (ok) {
+        $('r-title').textContent = '완주!';  $('r-title').className = 'r-title ok';
+        $('r-time').textContent  = elapsed.toFixed(3) + 's';
+        $('r-sub').textContent   = 'a → z 를 모두 입력했습니다!';
+        $('name-form').style.display = '';
+        $('btn-save').disabled = false;
+        $('name-inp').value = '';
+        setTimeout(() => $('name-inp').focus(), 80);
+    } else {
+        $('r-title').textContent = '실패';  $('r-title').className = 'r-title ng';
+        $('r-time').textContent = elapsed.toFixed(3) + 's';
+        $('r-sub').textContent  = `"${ALPHA[curIdx]}" 을 입력해야 할 때 "${wrongKey}" 를 눌렀습니다.`;
+        $('name-form').style.display = 'none';
+    }
+    renderLB(null);
+}
+
+/* ── Leaderboard (Supabase 서버) ── */
+async function getLB() {
+    try {
+        const res = await fetch(
+            `${SCORES_API}?select=name,time,created_at&order=time.asc&limit=7`,
+            { headers: SB_HEADERS });
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+async function saveLB(name, time) {
+    const res = await fetch(SCORES_API, {
+        method: 'POST',
+        headers: { ...SB_HEADERS, Prefer: 'return=minimal' },
+        body: JSON.stringify({ name, time })
+    });
+    if (!res.ok) throw new Error('save failed: ' + res.status);
+}
+const MEDALS = ['🥇','🥈','🥉','4위','5위','6위','7위'];
+function esc(s) { return s.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+let lbReqId = 0;
+async function renderLB(hlTime) {
+    const list = $('lb-list');
+    const myReq = ++lbReqId;
+    list.innerHTML = '<div class="lb-empty">불러오는 중…</div>';
+    const lb = await getLB();
+    if (myReq !== lbReqId) return;            // 더 최신 요청이 있으면 이 결과는 버림
+    if (!lb.length) { list.innerHTML = '<div class="lb-empty">아직 기록이 없습니다.</div>'; return; }
+    list.innerHTML = lb.map((e, i) => {
+        const hl = hlTime !== null && Math.abs(Number(e.time) - hlTime) < 0.001;
+        const date = e.created_at ? new Date(e.created_at).toLocaleDateString('ko-KR') : '';
+        return `<div class="lb-row${hl?' hl':''}">
+            <span class="lb-rank">${MEDALS[i]}</span>
+            <span class="lb-name">${esc(e.name)}</span>
+            <span class="lb-time">${Number(e.time).toFixed(3)}s</span>
+            <span class="lb-date">${date}</span>
+        </div>`;
+    }).join('');
+}
+
+/* ── Save ── */
+async function doSave() {
+    const name = $('name-inp').value.trim() || '익명';
+    const btn = $('btn-save');
+    btn.disabled = true;
+    try {
+        await saveLB(name, elapsed);
+        $('name-form').style.display = 'none';
+        renderLB(elapsed);
+    } catch (err) {
+        btn.disabled = false;
+        alert('기록 저장에 실패했습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.');
+    }
+}
+$('btn-save').addEventListener('click', doSave);
+$('name-inp').addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
+
+/* ── Restart ── */
+function doRestart() { state = 'idle'; show('ready'); }
+$('btn-again').addEventListener('click', doRestart);
+
+show('ready');
+</script>
+</body>
+</html>
